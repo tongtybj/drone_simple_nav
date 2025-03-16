@@ -15,6 +15,9 @@ find_package(
     geometry_msgs
     actionlib
     actionlib_msgs
+    pcl_ros
+    pcl_conversions
+    sensor_msgs
 )
 
 # # System dependencies are found with CMake's conventions
@@ -154,6 +157,10 @@ include_directories(
 # target_link_libraries(${PROJECT_NAME}_node
 # ${catkin_LIBRARIES}
 # )
+
+add_executable(pointcloud_assemble_node src/utils/pointcloud_assemble.cpp)
+target_link_libraries (pointcloud_assemble_node ${catkin_LIBRARIES})
+
 
 # ############
 # # Install ##
