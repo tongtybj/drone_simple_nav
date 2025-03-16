@@ -12,11 +12,13 @@ class FakeMavros():
 
         # Parameters
         self.odom_hz = 30
+        self.receive_cmd = False
         init_pos = rospy.get_param("~init_pos", "0.0, 4.0, 2.0")
         self.init_pos = [float(x) for x in init_pos.split(",")]
-        
+
         # Subscribers
         self.local_pos_cmd_sub = rospy.Subscriber('mavros/setpoint_raw/local', PositionTarget, self.cmd_cb)
+        self.real_odom_sub = rospy.Subscriber('mavros/real_odom', Odometry, self.odom_cb)
 
         # Publishers
         self.odom_pub = rospy.Publisher('mavros/local_position/odom', Odometry, queue_size=10)
@@ -40,10 +42,20 @@ class FakeMavros():
 
         self.publish_odom()
 
+    def odom_cb(self, data):
+
+        if self.receive_cmd:
+            return
+
+        self.odom = data
+
     def cmd_cb(self, data):
         '''
         Make the odom the same as the cmd
         '''
+
+        self.receive_cmd = True
+
         self.odom.header.stamp = rospy.Time.now()
         self.odom.pose.pose.position.x = data.position.x
         self.odom.pose.pose.position.y = data.position.y

@@ -26,9 +26,9 @@ class Visualizer():
         self.drone_marker.color.g = self.drone_color[1]/256
         self.drone_marker.color.b = self.drone_color[2]/256
         self.drone_marker.color.a = 1
-        self.drone_marker.scale.x = 1.5
-        self.drone_marker.scale.y = 1.5
-        self.drone_marker.scale.z = 1.5
+        self.drone_marker.scale.x = 1.0
+        self.drone_marker.scale.y = 1.0
+        self.drone_marker.scale.z = 1.0
 
         # Subscribers
         self.odom_sub = rospy.Subscriber('mavros/local_position/odom', Odometry, self.odom_cb)

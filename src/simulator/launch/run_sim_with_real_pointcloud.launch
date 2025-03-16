@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="gazebo_world" default="bricks"/>
+    <arg name="init_pos" default="0.0, 0.0, 2.0" />
+    <arg name="target_pos_z" default="1.5" />
+    <arg name="move_vel" default='2.0' />
+    <arg name="replan_mode" default='fix_time' /> 
+    <!-- available options: global, fix_time, rush -->
+
+    <node pkg="planner" type="pointcloud_assemble_node" name="pointcloud_assemble" output="screen">
+      <param name="batch_size" value="200"/>  <!--50 is also possible, but should after 20sec  -->
+      <remap from="input_point_cloud" to="/dragon/cloud_registered"/>
+      <remap from="output_point_cloud" to="/pointcloud/output" />
+    </node>
+    <node pkg="tf" type="static_transform_publisher" name="slam_origin_broadcaster" args="0 0 0 0 0 0  map camera_init 10" />
+
+    <node pkg="simulator" type="mavros_node.py" name="mavros_node" output="screen">
+      <param name="init_pos" value="$(arg init_pos)" />
+      <remap from="mavros/real_odom" to ="/dragon/Odometry_precede" />
+    </node>
+
+    <include file="$(find planner)/launch/single_drone_planner.launch">
+        <arg name="target_pos_z" value="$(arg target_pos_z)" />
+        <arg name="move_vel" value="$(arg move_vel)" />
+        <arg name="replan_mode" value="$(arg replan_mode)" />
+    </include>
+
+</launch>
