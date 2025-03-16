@@ -5,9 +5,6 @@
     <arg name="gazebo_world" default="poles"/>
     <arg name="sensor_max_range" default="inf"/>
 
-    <!-- Rviz -->
-    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find planner)/rviz/rviz_config.rviz" />
-
     <!-- publish pointcloud -->
     <node pkg="simulator" type="publish_pointcloud" name="publish_pointcloud">
         <param name="path" type="str" value="$(find simulator)/worlds/$(arg gazebo_world).pcd" />
