@@ -24,6 +24,9 @@ class GeoPlanner(TrajUtils):
         start_pos = plan_init_state.global_pos
         target_pos = target_state[0]
 
+        print("start_pos:", start_pos)
+        print("target_pos:", target_pos)
+
         time_start = time.time()
         path = self.astar_planner.plan(map, start_pos, target_pos)
         time_end = time.time()
@@ -31,18 +34,19 @@ class GeoPlanner(TrajUtils):
 
         if path is None:
             raise Exception("A star planner failed to find a path!")
+        prune_path = self.prune_path_nodes(map, path)
 
-        path = self.prune_path_nodes(map, path)
+        #print("path:", path)
 
         des_state = []
 
-        for i in range(len(path) - 1):
-            seg_start = np.array(path[i])
-            seg_end = np.array(path[i + 1])
+        for i in range(len(prune_path) - 1):
+            seg_start = np.array(prune_path[i])
+            seg_end = np.array(prune_path[i + 1])
             seg_unit_dir = (seg_end - seg_start) / np.linalg.norm(seg_end - seg_start)
             seg_length = np.linalg.norm(seg_end - seg_start)
             seg_time = seg_length / self.move_vel
-            sample_num = int(seg_time * self.cmd_hz) + 1
+            sample_num = max(int(seg_time * self.cmd_hz) + 1, 2)
             seg_vel = self.move_vel * seg_unit_dir
             seg_acc = np.zeros(3)
 
@@ -56,11 +60,15 @@ class GeoPlanner(TrajUtils):
             seg_des_state[:, 1, :] = des_vel
             seg_des_state[:, 2, :] = des_acc
 
+            #print("{}; sample_num: {} ; seg_des_state:{}".format(i, sample_num, seg_des_state))
+
             des_state.append(seg_des_state)
 
         des_state = np.concatenate(des_state, axis=0)
-        
-        return des_state
+
+        #print("des_state:", des_state)
+
+        return des_state, path, prune_path
 
     def read_planning_condition(self, head_state, tail_state, int_wpts, ts):
         self.D = head_state.shape[1]
@@ -86,7 +94,7 @@ class GeoPlanner(TrajUtils):
         tail_index = int(1)
 
         while tail_index < len(path):
-            while map.seg_feasible_check(path[head_index], path[tail_index]) or tail_index - head_index == 1:
+            while map.seg_feasible_check(path[head_index], path[tail_index], step_size=0.1, collision_scale=1.5) or tail_index - head_index == 1:
                 tail_index += 1
                 if tail_index == len(path):
                     break

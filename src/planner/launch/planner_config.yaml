@@ -4,7 +4,7 @@ planning_time_ahead: 1.0
 longitu_step_dis: 5.0
 lateral_step_length: 1.0
 target_reach_threshold: 0.2
-cmd_hz: 60
+cmd_hz: 10
 yaw_shift_tol: 0.17453
 
 # A star
@@ -13,4 +13,4 @@ min_flight_height: 1.0
 max_flight_height: 4.0
 
 # Collision check
-collision_threshold: 0.2
+collision_threshold: 0.4

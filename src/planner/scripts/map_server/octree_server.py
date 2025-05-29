@@ -12,6 +12,7 @@ class OctreeServer():
         self.neighbor_dis = collision_threshold
 
     def octomap_cb(self, msg):
+
         try:
             file_header = "# Octomap OcTree binary file\n"
             file_header += "id " + msg.id + "\n"
@@ -28,6 +29,7 @@ class OctreeServer():
             complete_data = header_bytes + data_bytes
 
             tmp_octree = octomap.OcTree(msg.resolution)
+            # will occur ERROR: Tree size mismatch:
             tmp_octree.readBinary(complete_data)
             actual_size = tmp_octree.size()
 
@@ -79,7 +81,7 @@ class OctreeServer():
     def has_collision_strict(self, point):
         return self.has_collision(point, scaling=1.5)
 
-    def seg_feasible_check(self, head_pos, tail_pos, step_size=0.1):
+    def seg_feasible_check(self, head_pos, tail_pos, step_size=0.1, collision_scale=1.0):
         '''
         Check if the straight line from head_pos to tail_pos is feasible.
         '''
@@ -92,6 +94,7 @@ class OctreeServer():
         z_check_list = np.linspace(z0, z1, step_num)
 
         for x, y, z in zip(x_check_list, y_check_list, z_check_list):
-            if self.is_point_occupied([x, y, z]):
+            #if self.is_point_occupied([x, y, z]):
+            if self.has_collision([x, y, z], collision_scale):
                 return False
         return True

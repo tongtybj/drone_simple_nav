@@ -3,7 +3,7 @@ import sys
 current_path = os.path.abspath(os.path.dirname(__file__))[:-9]  # -9 removes '/ros_node'
 sys.path.insert(0, current_path)
 from sensor_msgs.msg import PointCloud2
-from tf.transformations import euler_from_quaternion
+from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from planner.msg import *
 import actionlib
 from nav_msgs.msg import Odometry, Path
@@ -19,7 +19,7 @@ from visualizer.visualizer import Visualizer
 from traj_planner.geo_planner import GeoPlanner
 from map_server.octree_server import OctreeServer
 from octomap_msgs.msg import Octomap
-
+from geometry_msgs.msg import PoseStamped
 
 class DroneState():
     def __init__(self):
@@ -98,8 +98,13 @@ class TrajPlanner():
 
         # Publishers
         self.local_pos_cmd_pub = rospy.Publisher("mavros/setpoint_raw/local", PositionTarget, queue_size=10)
+        self.pose_cmd_pub = rospy.Publisher("target_pose", PoseStamped, queue_size=1)
         self.target_vis_pub = rospy.Publisher('global_target', Marker, queue_size=10)
         self.local_target_pub = rospy.Publisher('local_target', Marker, queue_size=10)
+
+
+        self.raw_path_pub = rospy.Publisher("raw_path", Path, queue_size=1)
+        self.prune_path_pub = rospy.Publisher("prune_path", Path, queue_size=1)
         # self.des_wpts_pub = rospy.Publisher('des_wpts', MarkerArray, queue_size=10)
         # self.des_path_pub = rospy.Publisher('des_path', MarkerArray, queue_size=10)
 
@@ -129,6 +134,7 @@ class TrajPlanner():
                           data.pose.pose.orientation.z)  # from local to global
         global_vel = quat.rotate(local_vel)
         self.drone_state.global_pos = global_pos
+        #rospy.loginfo("global_pos: {}".format(global_pos))
         self.drone_state.global_vel = global_vel
         self.drone_state.local_vel = local_vel
         self.drone_state.attitude = quat
@@ -223,7 +229,7 @@ class TrajPlanner():
 
         self.target_state = np.array([self.global_target, np.zeros(3)])  # [3d pos, 3d vel]
 
-        self.first_plan()
+        self.plan()
         self.start_tracking()
         # self.visualize_des_wpts()
         # self.visualize_des_path()
@@ -258,7 +264,7 @@ class TrajPlanner():
         # self.visualize_local_target()
         while True:
             try:
-                self.first_plan()
+                self.plan()
                 break
             except Exception as ex:
                 rospy.logwarn("First planning failed: %s", ex)
@@ -274,19 +280,24 @@ class TrajPlanner():
         # self.visualize_des_path()
 
     def replan_cb(self, event):
+
+        print("self.des_state_length: {}, self.des_state_index: {}".format(self.des_state_length, self.des_state_index))
         if (
             not self.reached_target
             and not self.near_global_target
             and not self.plan_server.is_preempt_requested()
+            and self.des_state_length == self.des_state_index + 1
         ):
             self.try_local_planning()
 
     def try_local_planning(self):
+
         seed = 0
         self.set_local_target(seed)
         while True:
             try:
-                self.replan()
+                self.plan()
+                self.des_state_index = 0
                 break
             except Exception as ex:
                 rospy.logwarn("Local planning failed: %s", ex)
@@ -345,9 +356,9 @@ class TrajPlanner():
 
         self.visualize_local_target()
 
-    def first_plan(self):
+    def plan(self):
         time_start = time.time()
-        des_state = self.geo_traj_plan(self.map, self.drone_state, self.target_state)
+        des_state, path, prune_path = self.geo_traj_plan(self.map, self.drone_state, self.target_state)
         time_end = time.time()
 
         rospy.loginfo("Planning time: {}".format(time_end - time_start))
@@ -357,6 +368,7 @@ class TrajPlanner():
         self.des_state_array = des_state
         self.des_state_length = self.des_state_array.shape[0]
 
+    # depreacated
     def get_drone_state_ahead(self):
         '''
         get the drone state after 1s from self.des_state
@@ -366,28 +378,58 @@ class TrajPlanner():
         drone_state_ahead = DroneState()
         drone_state_ahead.global_pos = self.des_state_array[self.future_index, 0, :]
         drone_state_ahead.global_vel = self.des_state_array[self.future_index, 1, :]
+        print("get drone state ahead: ", self.des_state_array)
         return drone_state_ahead
 
     def replan(self):
-        drone_state_ahead = self.get_drone_state_ahead()
+
+        rospy.loginfo("self.drone_state: {}; target_state: {}".format(self.drone_state.global_pos, self.target_state[0]))
 
         time_start = time.time()
-        des_state = self.geo_traj_plan(self.map, drone_state_ahead, self.target_state)
+        des_state, path, prune_path = self.geo_traj_plan(self.map, self.drone_state, self.target_state)
         time_end = time.time()
 
         rospy.loginfo("Planning time: {}".format(time_end - time_start))
 
         # Concatenate the new trajectory to the old one, at index self.future_index
-        self.des_state_array = np.concatenate((self.des_state_array[:self.future_index], des_state), axis=0)
+        self.des_state_array = des_state
         self.des_state_length = self.des_state_array.shape[0]
 
-    def geo_traj_plan(self, map, plan_init_state, target_state):
-        des_state = self.planner.geo_traj_plan(map, plan_init_state, target_state)
+        self.des_state_index = 0
 
-        return des_state
+    def geo_traj_plan(self, map, plan_init_state, target_state):
+        des_state, raw_path, prune_path = self.planner.geo_traj_plan(map, plan_init_state, target_state)
 
         # visualize path
         # self.visualize_init_path(path)
+
+        raw_path_msg = Path()
+        raw_path_msg.header.frame_id = "map"
+        raw_path_msg.header.stamp = rospy.Time.now()
+        for pos in raw_path:
+            pose = PoseStamped()
+            pose.header = raw_path_msg.header
+            pose.pose.position.x = pos[0]
+            pose.pose.position.y = pos[1]
+            pose.pose.position.z = pos[2]
+            pose.pose.orientation.w = 1
+            raw_path_msg.poses.append(pose)
+        self.raw_path_pub.publish(raw_path_msg)
+
+        prune_path_msg = Path()
+        prune_path_msg.header.frame_id = "map"
+        prune_path_msg.header.stamp = rospy.Time.now()
+        for pos in prune_path:
+            pose = PoseStamped()
+            pose.header = prune_path_msg.header
+            pose.pose.position.x = pos[0]
+            pose.pose.position.y = pos[1]
+            pose.pose.position.z = pos[2]
+            pose.pose.orientation.w = 1
+            prune_path_msg.poses.append(pose)
+        self.prune_path_pub.publish(prune_path_msg)
+
+        return des_state, raw_path, prune_path
 
     def warm_up(self):
         # Send a few setpoints before switching to OFFBOARD mode
@@ -441,7 +483,18 @@ class TrajPlanner():
 
         self.state_cmd.header.stamp = rospy.Time.now()
 
+
         self.local_pos_cmd_pub.publish(self.state_cmd)
+
+        q = quaternion_from_euler(0, 0, self.state_cmd.yaw)
+        pose_cmd = PoseStamped()
+        pose_cmd.header.stamp = self.state_cmd.header.stamp + rospy.Duration(1/self.cmd_hz)
+        pose_cmd.pose.position = self.state_cmd.position
+        pose_cmd.pose.orientation.x = q[0]
+        pose_cmd.pose.orientation.y = q[1]
+        pose_cmd.pose.orientation.z = q[2]
+        pose_cmd.pose.orientation.w = q[3]
+        self.pose_cmd_pub.publish(pose_cmd)
 
         if self.des_state_index < self.des_state_length - 1:
             self.des_state_index += 1
