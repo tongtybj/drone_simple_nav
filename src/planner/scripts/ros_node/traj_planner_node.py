@@ -45,12 +45,11 @@ class TrajPlanner():
         # Parameters
         a_star_config = AstarConfig()
         collision_threshold = rospy.get_param("~collision_threshold", 0.4)
-        self.replan_mode = rospy.get_param("~replan_mode", 'fix_time')  # available options: global, fix_time, rush
-        self.replan_period = rospy.get_param("~replan_period", 0.5)  # the interval between replanning， 0 means replan right after the previous plan
-        self.planning_time_ahead = rospy.get_param("~planning_time_ahead", 1.0)  # the time ahead of the current time to plan the trajectory
+        self.plan_mode = rospy.get_param("~plan_mode", 'segment')
         self.longitu_step_dis = rospy.get_param("~longitu_step_dis", 5.0)  # the distance forward in each replanning
         self.lateral_step_length = rospy.get_param("~lateral_step_length", 1.0)  # if local target pos in obstacle, take lateral step
-        self.target_reach_threshold = rospy.get_param("~target_reach_threshold", 0.2)
+        self.global_target_reach_threshold = rospy.get_param("~global_target_reach_threshold", 0.2)
+        self.local_target_reach_threshold = rospy.get_param("~local_target_reach_threshold", 1.0)
         self.cmd_hz = rospy.get_param("~cmd_hz", 60)
         self.yaw_shift_tol = rospy.get_param("~yaw_shift_tol", 0.17453)
         self.move_vel = rospy.get_param("~move_vel", 1.0)
@@ -78,15 +77,13 @@ class TrajPlanner():
         self.state_cmd.coordinate_frame = 1
         self.des_path = Path()
         self.init_marker_arrays()
+        self.target_state = None
 
         # Flags and counters
         self.target_received = False
         self.reached_target = False
         self.near_global_target = False
         self.odom_received = False
-        self.des_state_index = 0
-        self.future_index = 99999
-        self.des_state_length = 99999  # this is used to check if the des_state_index is valid
 
         # Server
         self.plan_server = actionlib.SimpleActionServer('plan', PlanAction, self.execute_mission, False)
@@ -101,12 +98,11 @@ class TrajPlanner():
         self.pose_cmd_pub = rospy.Publisher("target_pose", PoseStamped, queue_size=1)
         self.target_vis_pub = rospy.Publisher('global_target', Marker, queue_size=10)
         self.local_target_pub = rospy.Publisher('local_target', Marker, queue_size=10)
+        self.target_path_pub = rospy.Publisher("target_path", Path, queue_size=1)
 
 
         self.raw_path_pub = rospy.Publisher("raw_path", Path, queue_size=1)
         self.prune_path_pub = rospy.Publisher("prune_path", Path, queue_size=1)
-        # self.des_wpts_pub = rospy.Publisher('des_wpts', MarkerArray, queue_size=10)
-        # self.des_path_pub = rospy.Publisher('des_path', MarkerArray, queue_size=10)
 
         rospy.loginfo(f"Trajectory planner initialized!")
 
@@ -147,7 +143,7 @@ class TrajPlanner():
 
         self.drone_state.yaw = euler[2]
 
-        if self.target_received and np.linalg.norm(global_pos - self.global_target) < self.target_reach_threshold:
+        if self.target_received and np.linalg.norm(global_pos - self.global_target) < self.global_target_reach_threshold:
             rospy.loginfo("Global target reached!\n")
             self.end_mission(reached_target=True)
 
@@ -155,15 +151,15 @@ class TrajPlanner():
         self.target_received = True
         self.reached_target = False
         self.near_global_target = False
-        self.des_state_index = 0
+
+        current_pos = self.drone_state.global_pos
+        self.target_state = np.array([current_pos, [0,0,0]])
 
     def end_mission(self, reached_target):
-        self.tracking_cmd_timer.shutdown()
         self.target_received = False
         self.reached_target = reached_target
         self.near_global_target = False
-        self.des_state_index = 0
-        if self.replan_mode == 'fix_time':
+        if self.plan_mode == 'segment':
             self.replan_timer.shutdown()
 
     def execute_mission(self, goal):
@@ -175,14 +171,11 @@ class TrajPlanner():
 
         self.init_mission()
 
-        if self.replan_mode == 'global':
-            rospy.loginfo("Replan mode: global")
+        if self.plan_mode == 'global':
+            rospy.loginfo("Plan mode: global")
             self.global_planning()
-        elif self.replan_mode == 'rush':
-            rospy.loginfo("Replan mode: rush")
-            self.online_planning()
-        elif self.replan_mode == 'fix_time':
-            rospy.loginfo("Replan mode: fix_time")
+        elif self.plan_mode == 'segment':
+            rospy.loginfo("Plan mode: segment")
             self.periodic_planning()
         else:
             rospy.logerr("Invalid replan_mode!")
@@ -230,74 +223,31 @@ class TrajPlanner():
         self.target_state = np.array([self.global_target, np.zeros(3)])  # [3d pos, 3d vel]
 
         self.plan()
-        self.start_tracking()
-        # self.visualize_des_wpts()
-        # self.visualize_des_path()
-
-    def online_planning(self):
-        while not self.odom_received:
-            time.sleep(0.01)
-
-        self.try_first_plan()
-        self.start_tracking()
-
-        while (
-                not self.reached_target
-                and not self.near_global_target
-                and not self.plan_server.is_preempt_requested()
-        ):
-            self.try_local_planning()
 
     def periodic_planning(self):
         while not self.odom_received:
             time.sleep(0.01)
 
-        self.try_first_plan()
-        self.start_tracking()
-
-        # after the first plan, replan periodically
-        self.replan_timer = rospy.Timer(rospy.Duration(self.replan_period), self.replan_cb)
-
-    def try_first_plan(self):
-        seed = 0
-        self.set_local_target(seed)
-        # self.visualize_local_target()
-        while True:
-            try:
-                self.plan()
-                break
-            except Exception as ex:
-                rospy.logwarn("First planning failed: %s", ex)
-                seed += 1
-                self.set_local_target(seed)
-                if seed > 10:
-                    rospy.logerr("Entire planning failed!\n")
-                    self.end_mission(reached_target=False)
-                    self.plan_server.set_aborted()
-                    return
-
-        # self.visualize_des_wpts()
-        # self.visualize_des_path()
+        self.replan_timer = rospy.Timer(rospy.Duration(0.01), self.replan_cb)
 
     def replan_cb(self, event):
 
-        print("self.des_state_length: {}, self.des_state_index: {}".format(self.des_state_length, self.des_state_index))
-        if (
-            not self.reached_target
-            and not self.near_global_target
-            and not self.plan_server.is_preempt_requested()
-            and self.des_state_length == self.des_state_index + 1
-        ):
-            self.try_local_planning()
+        if self.reached_target or self.near_global_target:
+            return
 
-    def try_local_planning(self):
+        if self.plan_server.is_preempt_requested():
+            return
 
         seed = 0
-        self.set_local_target(seed)
+        replan_flag = self.set_local_target(seed)
+
+        if not replan_flag: # no need to replan
+            return
+
+
         while True:
             try:
                 self.plan()
-                self.des_state_index = 0
                 break
             except Exception as ex:
                 rospy.logwarn("Local planning failed: %s", ex)
@@ -309,26 +259,31 @@ class TrajPlanner():
                     self.plan_server.set_aborted()
                     return
 
-        # self.visualize_des_wpts()
-        # self.visualize_des_path()
-
     def set_local_target(self, seed=0):
         current_pos = self.drone_state.global_pos
         current_pos_2d = current_pos[:2]
         global_target_pos = self.global_target
         global_target_pos_2d = global_target_pos[:2]
+        local_target_pos = self.target_state[0]
+
+
+        # if current pos is far from the local target, do not need to update the local target
+        if np.linalg.norm(local_target_pos - current_pos) > self.local_target_reach_threshold:  # 3d distance
+            return False
 
         # if current pos is close enough to global target, set local target as global target
         if np.linalg.norm(global_target_pos - current_pos) < self.longitu_step_dis:  # 3d distance
             self.target_state[0] = global_target_pos
             self.near_global_target = True
-            return
+            return True
+
 
         longitu_dir = (global_target_pos_2d - current_pos_2d)/np.linalg.norm(global_target_pos_2d - current_pos_2d)
         lateral_dir = np.array([[longitu_dir[1], -longitu_dir[0]],
                                 [-longitu_dir[1], longitu_dir[0]]])
         lateral_dir_flag = 0
         lateral_move_dis = self.lateral_step_length
+
 
         # get local target pos
         if seed > 1e-3:
@@ -356,53 +311,40 @@ class TrajPlanner():
 
         self.visualize_local_target()
 
+        return True
+
     def plan(self):
-        time_start = time.time()
-        des_state, path, prune_path = self.geo_traj_plan(self.map, self.drone_state, self.target_state)
-        time_end = time.time()
-
-        rospy.loginfo("Planning time: {}".format(time_end - time_start))
-
-        # First planning! Retrieve planned trajectory
-        # Set the des_state_array as des_state
-        self.des_state_array = des_state
-        self.des_state_length = self.des_state_array.shape[0]
-
-    # depreacated
-    def get_drone_state_ahead(self):
-        '''
-        get the drone state after 1s from self.des_state
-        '''
-        self.future_index = min(int(self.planning_time_ahead * self.cmd_hz) + self.des_state_index,
-                                self.des_state_length - 1)
-        drone_state_ahead = DroneState()
-        drone_state_ahead.global_pos = self.des_state_array[self.future_index, 0, :]
-        drone_state_ahead.global_vel = self.des_state_array[self.future_index, 1, :]
-        print("get drone state ahead: ", self.des_state_array)
-        return drone_state_ahead
-
-    def replan(self):
-
-        rospy.loginfo("self.drone_state: {}; target_state: {}".format(self.drone_state.global_pos, self.target_state[0]))
 
         time_start = time.time()
-        des_state, path, prune_path = self.geo_traj_plan(self.map, self.drone_state, self.target_state)
+        raw_path, prune_path = self.planner.geo_traj_plan(self.map, self.drone_state, self.target_state)
         time_end = time.time()
-
         rospy.loginfo("Planning time: {}".format(time_end - time_start))
 
-        # Concatenate the new trajectory to the old one, at index self.future_index
-        self.des_state_array = des_state
-        self.des_state_length = self.des_state_array.shape[0]
+        # send the path command 
+        target_path_msg = Path()
+        target_path_msg.header.frame_id = "world"
+        t = rospy.Time.now().to_sec()
+        target_path_msg.header.stamp = rospy.Time.from_sec(t)
+        for i, pos in enumerate(prune_path[1:]):
 
-        self.des_state_index = 0
+            pose = PoseStamped()
+            pose.header.seq = i
+            pose.header.frame_id = target_path_msg.header.frame_id
+            prev_pos = np.array(prune_path[i])
+            pos = np.array(pos)
+            t += np.linalg.norm(prev_pos - pos) / self.move_vel
+            pose.header.stamp = rospy.Time.from_sec(t)
 
-    def geo_traj_plan(self, map, plan_init_state, target_state):
-        des_state, raw_path, prune_path = self.planner.geo_traj_plan(map, plan_init_state, target_state)
+            pose.pose.position.x = pos[0]
+            pose.pose.position.y = pos[1]
+            pose.pose.position.z = pos[2]
+            pose.pose.orientation.w = 1
+            target_path_msg.poses.append(pose)
+
+        self.target_path_pub.publish(target_path_msg)
+
 
         # visualize path
-        # self.visualize_init_path(path)
-
         raw_path_msg = Path()
         raw_path_msg.header.frame_id = "map"
         raw_path_msg.header.stamp = rospy.Time.now()
@@ -429,75 +371,7 @@ class TrajPlanner():
             prune_path_msg.poses.append(pose)
         self.prune_path_pub.publish(prune_path_msg)
 
-        return des_state, raw_path, prune_path
-
-    def warm_up(self):
-        # Send a few setpoints before switching to OFFBOARD mode
-        self.state_cmd.position.x = self.drone_state.global_pos[0]
-        self.state_cmd.position.y = self.drone_state.global_pos[1]
-        self.state_cmd.position.z = self.drone_state.global_pos[2]
-        rate = rospy.Rate(100)
-        for _ in range(5):  # set 5 points
-            if (rospy.is_shutdown()):
-                break
-            self.local_pos_cmd_pub.publish(self.state_cmd)
-            rate.sleep()
-
-    def enter_offboard(self):
-        '''
-        if not in OFFBOARD mode, switch to OFFBOARD mode
-        '''
-        if self.flight_state.mode != "OFFBOARD":
-            self.warm_up()
-            set_offb_req = SetModeRequest()
-            set_offb_req.custom_mode = 'OFFBOARD'
-            if (self.set_mode_client.call(set_offb_req).mode_sent == True):
-                rospy.loginfo("OFFBOARD enabled")
-
-    def start_tracking(self):
-        '''
-        When triggered, start to publish full state cmd
-        '''
-        # self.enter_offboard()
-
-        self.tracking_cmd_timer = rospy.Timer(rospy.Duration(1/self.cmd_hz), self.tracking_cmd_timer_cb)
-
-    def tracking_cmd_timer_cb(self, event):
-        '''
-        Publish state cmd, height is fixed to current height
-        '''
-        self.state_cmd.position.x = self.des_state_array[self.des_state_index][0][0]
-        self.state_cmd.position.y = self.des_state_array[self.des_state_index][0][1]
-        self.state_cmd.position.z = self.des_state_array[self.des_state_index][0][2]
-
-        self.state_cmd.velocity.x = self.des_state_array[self.des_state_index][1][0]
-        self.state_cmd.velocity.y = self.des_state_array[self.des_state_index][1][1]
-        self.state_cmd.velocity.z = self.des_state_array[self.des_state_index][1][2]
-
-        self.state_cmd.acceleration_or_force.x = self.des_state_array[self.des_state_index][2][0]
-        self.state_cmd.acceleration_or_force.y = self.des_state_array[self.des_state_index][2][1]
-        self.state_cmd.acceleration_or_force.z = self.des_state_array[self.des_state_index][2][2]
-
-        self.state_cmd.yaw = np.arctan2(self.des_state_array[self.des_state_index][0][1] - self.des_state_array[self.des_state_index - 1][0][1],
-                                        self.des_state_array[self.des_state_index][0][0] - self.des_state_array[self.des_state_index - 1][0][0])
-
-        self.state_cmd.header.stamp = rospy.Time.now()
-
-
-        self.local_pos_cmd_pub.publish(self.state_cmd)
-
-        q = quaternion_from_euler(0, 0, self.state_cmd.yaw)
-        pose_cmd = PoseStamped()
-        pose_cmd.header.stamp = self.state_cmd.header.stamp + rospy.Duration(1/self.cmd_hz)
-        pose_cmd.pose.position = self.state_cmd.position
-        pose_cmd.pose.orientation.x = q[0]
-        pose_cmd.pose.orientation.y = q[1]
-        pose_cmd.pose.orientation.z = q[2]
-        pose_cmd.pose.orientation.w = q[3]
-        self.pose_cmd_pub.publish(pose_cmd)
-
-        if self.des_state_index < self.des_state_length - 1:
-            self.des_state_index += 1
+        return raw_path, prune_path
 
     def init_marker_arrays(self):
         # local target
@@ -520,67 +394,6 @@ class TrajPlanner():
         self.local_target_marker.pose.position.z = self.target_state[0][2]
 
         self.local_target_pub.publish(self.local_target_marker)
-
-    #     # des wpts
-    #     self.wpts_markerarray = MarkerArray()
-    #     # max_wpts_length = 20
-    #     max_wpts_length = 1000
-    #     for i in range(max_wpts_length):
-    #         marker = Marker()
-    #         marker.id = i
-    #         marker.header.frame_id = "map"
-    #         marker.type = Marker.SPHERE
-    #         marker.pose.orientation.w = 1.0
-    #         marker.scale.x = 0.4
-    #         marker.scale.y = 0.4
-    #         marker.scale.z = 0.4
-
-    #         self.wpts_markerarray.markers.append(marker)
-
-    #     # des path
-    #     self.path_markerarray = MarkerArray()
-    #     max_path_length = 1000
-    #     for i in range(max_path_length):
-    #         marker = Marker()
-    #         marker.id = i
-    #         marker.header.frame_id = "map"
-    #         marker.type = Marker.LINE_STRIP
-    #         marker.pose.orientation.w = 1.0
-    #         marker.scale.x = 0.1
-
-    #         self.path_markerarray.markers.append(marker)
-
-    # def visualize_init_path(self, path):
-    #     '''
-    #     path: [[x1,y1], [x2,y2], ...]
-    #     This function is only used for demo. When using, make sure the length of MarkerArray is enough (around line 638)
-    #     Plus, self.planner.geo_traj_plan should return the path
-    #     '''
-    #     path_array = np.array(path).T
-    #     print("shape of path_array: ", path_array.shape)
-    #     pos_array = np.vstack((path_array, self.target_pos_z * np.ones([1, path_array.shape[1]]))).T
-    #     self.wpts_markerarray = self.visualizer.modify_wpts_markerarray(self.wpts_markerarray, pos_array)
-    #     self.des_path_pub.publish(self.wpts_markerarray)
-
-    # def visualize_des_wpts(self):
-    #     '''
-    #     Visualize the desired waypoints as markers
-    #     '''
-    #     pos_array = self.planner.int_wpts  # shape: (2,n)
-    #     pos_array = np.vstack((pos_array, self.target_pos_z * np.ones([1, pos_array.shape[1]]))).T
-    #     self.wpts_markerarray = self.visualizer.modify_wpts_markerarray(
-    #         self.wpts_markerarray, pos_array)  # the id of self.wpts_markerarray will be the same
-    #     self.des_wpts_pub.publish(self.wpts_markerarray)
-
-    # def visualize_des_path(self):
-    #     '''
-    #     Visualize the desired path, where high-speed pieces and low-speed pieces are colored differently
-    #     '''
-    #     pos_array = self.planner.get_pos_array(hz=10)
-    #     pos_array = np.hstack((pos_array, self.target_pos_z * np.ones([len(pos_array), 1])))
-    #     vel_array = np.linalg.norm(self.planner.get_vel_array(), axis=1)  # shape: (n,)
-    #     self.path_markerarray = self.visualizer.modify_path_markerarray(self.path_markerarray, pos_array, vel_array)
-    #     self.des_path_pub.publish(self.path_markerarray)
 
 
 if __name__ == "__main__":

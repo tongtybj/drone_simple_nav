@@ -1,9 +1,11 @@
+
 # General
 replan_period: 1.0 # This is valid only when replan_mode (rosparam in traj_planner_node) is set to fix_time
 planning_time_ahead: 1.0
 longitu_step_dis: 5.0
 lateral_step_length: 1.0
-target_reach_threshold: 0.2
+global_target_reach_threshold: 0.2
+local_target_reach_threshold: 1.0
 cmd_hz: 10
 yaw_shift_tol: 0.17453
 

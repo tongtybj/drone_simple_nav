@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /Path1
+        - /Path2
       Splitter Ratio: 0.6110304594039917
     Tree Height: 1683
   - Class: rviz/Selection
@@ -159,7 +160,7 @@ Visualization Manager:
       Marker Topic: /local_target
       Name: Marker
       Namespaces:
-        {}
+        "": true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -197,7 +198,7 @@ Visualization Manager:
     - Alpha: 1
       Buffer Length: 1
       Class: rviz/Path
-      Color: 25; 255; 0
+      Color: 255; 0; 0
       Enabled: true
       Head Diameter: 0.30000001192092896
       Head Length: 0.20000000298023224
@@ -246,7 +247,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 23.636131286621094
+      Distance: 24.953887939453125
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -254,17 +255,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 10.566840171813965
-        Y: 0.8092308044433594
-        Z: 1.42987060546875
+        X: 4.007301330566406
+        Y: 0.4954772889614105
+        Z: -0.05916549265384674
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.1147966384887695
+      Pitch: 1.4947963953018188
       Target Frame: map
-      Yaw: 3.5435543060302734
+      Yaw: 3.2485506534576416
     Saved: ~
 Window Geometry:
   Displays:
@@ -283,4 +284,4 @@ Window Geometry:
     collapsed: true
   Width: 3840
   X: -32
-  Y: 22
+  Y: 0

@@ -3,9 +3,9 @@
     <arg name="gazebo_world" default="bricks"/>
     <arg name="init_pos" default="0.0, 0.0, 2.0" />
     <arg name="target_pos_z" default="1.5" />
-    <arg name="move_vel" default='1.0' />
-    <arg name="replan_mode" default='fix_time' />
-    <!-- available options: global, fix_time, rush -->
+    <arg name="move_vel" default='0.5' />
+    <arg name="plan_mode" default='segment' />
+    <!-- available options: global, segment -->
     <arg name="map_server" default="octomap" />
     <!-- available options: octomap, pcl -->
 
@@ -19,10 +19,11 @@
         <rosparam file="$(find planner)/launch/planner_config.yaml" command="load"/>
         <param name="target_pos_z" value="$(arg target_pos_z)" />
         <param name="move_vel" value="$(arg move_vel)" />
-        <param name="replan_mode" value="$(arg replan_mode)" />
+        <param name="plan_mode" value="$(arg plan_mode)" />
         <param name="map_server" value="$(arg map_server)" />
         <remap from="mavros/local_position/odom" to="/quadrotor/uav/baselink/odom" />
         <remap from="target_pose" to="/quadrotor/target_pose" />
+        <remap from="target_path" to="/quadrotor/target_path" />
         <param name="cmd_hz" value="2" />
     </node>
 

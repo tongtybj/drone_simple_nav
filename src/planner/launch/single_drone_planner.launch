@@ -3,7 +3,7 @@
     <!-- This launch file contains the launch scripts for a single drone -->
     <arg name="target_pos_z" default='2.0' />
     <arg name="move_vel" default='2.0' />
-    <arg name="replan_mode" default='fix_time' />
+    <arg name="plan_mode" default='segment' />
     <!-- available options: global, fix_time, rush -->
     <arg name="map_server" default="octomap" />
     <!-- available options: octomap, pcl -->
@@ -19,7 +19,7 @@
         <rosparam file="$(find planner)/launch/planner_config.yaml" command="load"/>
         <param name="target_pos_z" value="$(arg target_pos_z)" />
         <param name="move_vel" value="$(arg move_vel)" />
-        <param name="replan_mode" value="$(arg replan_mode)" />
+        <param name="plan_mode" value="$(arg plan_mode)" />
         <param name="map_server" value="$(arg map_server)" />
     </node>
 

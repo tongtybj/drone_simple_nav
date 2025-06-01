@@ -4,7 +4,7 @@
     <arg name="init_pos" default="0.0, 0.0, 2.0" />
     <arg name="target_pos_z" default="1.5" />
     <arg name="move_vel" default='2.0' />
-    <arg name="replan_mode" default='fix_time' />
+    <arg name="plan_mode" default='segment' />
     <!-- available options: global, fix_time, rush -->
     <arg name="map_server" default="octomap" />
     <!-- available options: octomap, pcl -->
@@ -20,7 +20,7 @@
     <include file="$(find planner)/launch/single_drone_planner.launch">
         <arg name="target_pos_z" value="$(arg target_pos_z)" />
         <arg name="move_vel" value="$(arg move_vel)" />
-        <arg name="replan_mode" value="$(arg replan_mode)" />
+        <arg name="plan_mode" value="$(arg plan_mode)" />
         <arg name="map_server" value="$(arg map_server)" />
     </include>
 

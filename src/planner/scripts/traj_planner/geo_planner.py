@@ -36,39 +36,9 @@ class GeoPlanner(TrajUtils):
             raise Exception("A star planner failed to find a path!")
         prune_path = self.prune_path_nodes(map, path)
 
-        #print("path:", path)
-
-        des_state = []
-
-        for i in range(len(prune_path) - 1):
-            seg_start = np.array(prune_path[i])
-            seg_end = np.array(prune_path[i + 1])
-            seg_unit_dir = (seg_end - seg_start) / np.linalg.norm(seg_end - seg_start)
-            seg_length = np.linalg.norm(seg_end - seg_start)
-            seg_time = seg_length / self.move_vel
-            sample_num = max(int(seg_time * self.cmd_hz) + 1, 2)
-            seg_vel = self.move_vel * seg_unit_dir
-            seg_acc = np.zeros(3)
-
-            des_pos = np.linspace(seg_start, seg_end, sample_num)[1:]
-            des_vel = np.tile(seg_vel, (sample_num - 1, 1))
-            des_acc = np.tile(seg_acc, (sample_num - 1, 1))
-
-            seg_des_state = np.zeros((sample_num - 1, 3, self.D))  # 3*D: [pos, vel, acc].T * D
-
-            seg_des_state[:, 0, :] = des_pos
-            seg_des_state[:, 1, :] = des_vel
-            seg_des_state[:, 2, :] = des_acc
-
-            #print("{}; sample_num: {} ; seg_des_state:{}".format(i, sample_num, seg_des_state))
-
-            des_state.append(seg_des_state)
-
-        des_state = np.concatenate(des_state, axis=0)
-
         #print("des_state:", des_state)
 
-        return des_state, path, prune_path
+        return path, prune_path
 
     def read_planning_condition(self, head_state, tail_state, int_wpts, ts):
         self.D = head_state.shape[1]
@@ -94,7 +64,7 @@ class GeoPlanner(TrajUtils):
         tail_index = int(1)
 
         while tail_index < len(path):
-            while map.seg_feasible_check(path[head_index], path[tail_index], step_size=0.1, collision_scale=1.5) or tail_index - head_index == 1:
+            while map.seg_feasible_check(path[head_index], path[tail_index], step_size=0.1, collision_scale=1.0) or tail_index - head_index == 1:
                 tail_index += 1
                 if tail_index == len(path):
                     break
