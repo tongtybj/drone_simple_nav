@@ -78,6 +78,8 @@ class TrajPlanner():
         self.des_path = Path()
         self.init_marker_arrays()
         self.target_state = None
+        self.target_path = None
+        self.target_index = 0
 
         # Flags and counters
         self.target_received = False
@@ -99,10 +101,13 @@ class TrajPlanner():
         self.target_vis_pub = rospy.Publisher('global_target', Marker, queue_size=10)
         self.local_target_pub = rospy.Publisher('local_target', Marker, queue_size=10)
         self.target_path_pub = rospy.Publisher("target_path", Path, queue_size=1)
+        self.current_pos_pub = rospy.Publisher('current_pos', Marker, queue_size=10)
 
 
         self.raw_path_pub = rospy.Publisher("raw_path", Path, queue_size=1)
         self.prune_path_pub = rospy.Publisher("prune_path", Path, queue_size=1)
+
+        self.tracking_timer = rospy.Timer(rospy.Duration(0.05), self.tracking_cb)
 
         rospy.loginfo(f"Trajectory planner initialized!")
 
@@ -146,6 +151,22 @@ class TrajPlanner():
         if self.target_received and np.linalg.norm(global_pos - self.global_target) < self.global_target_reach_threshold:
             rospy.loginfo("Global target reached!\n")
             self.end_mission(reached_target=True)
+
+
+        # debug: publish the current pos
+        marker = Marker()
+        marker.header.frame_id = "map"
+        marker.type = marker.SPHERE
+        marker.action = marker.ADD
+        marker.pose = data.pose.pose
+        marker.scale.x = 0.4
+        marker.scale.y = 0.4
+        marker.scale.z = 0.4
+        marker.color.a = 1.0
+        marker.color.r = 1.0
+        marker.color.g = 0.0
+        marker.color.b = 1.0
+        self.current_pos_pub.publish(marker)
 
     def init_mission(self):
         self.target_received = True
@@ -228,7 +249,7 @@ class TrajPlanner():
         while not self.odom_received:
             time.sleep(0.01)
 
-        self.replan_timer = rospy.Timer(rospy.Duration(0.01), self.replan_cb)
+        self.replan_timer = rospy.Timer(rospy.Duration(0.1), self.replan_cb)
 
     def replan_cb(self, event):
 
@@ -320,6 +341,7 @@ class TrajPlanner():
         time_end = time.time()
         rospy.loginfo("Planning time: {}".format(time_end - time_start))
 
+
         # send the path command 
         target_path_msg = Path()
         target_path_msg.header.frame_id = "world"
@@ -341,7 +363,7 @@ class TrajPlanner():
             pose.pose.orientation.w = 1
             target_path_msg.poses.append(pose)
 
-        self.target_path_pub.publish(target_path_msg)
+        #self.target_path_pub.publish(target_path_msg)
 
 
         # visualize path
@@ -371,7 +393,40 @@ class TrajPlanner():
             prune_path_msg.poses.append(pose)
         self.prune_path_pub.publish(prune_path_msg)
 
-        return raw_path, prune_path
+        self.target_path =  prune_path
+        self.target_index = 0
+
+    def tracking_cb(self, event):
+
+
+        if self.target_path is None:
+            return
+
+        if self.target_index + 1 == len(self.target_path):
+            return
+
+        current_pos = self.drone_state.global_pos
+        waypoint_pos = np.array(self.target_path[self.target_index])
+        if np.linalg.norm(waypoint_pos - current_pos) > self.local_target_reach_threshold:
+            return
+
+        rospy.loginfo("close to the {}th waypoint: {}; current pos: {}".format(self.target_index, waypoint_pos, current_pos));
+
+        self.target_index += 1
+        waypoint_pos = np.array(self.target_path[self.target_index])
+
+        waypoint_msg = PoseStamped()
+        waypoint_msg.header.frame_id = "world"
+        dt = np.linalg.norm(waypoint_pos - current_pos) / self.move_vel
+        waypoint_msg.header.stamp = rospy.Time.now() + rospy.Duration(dt)
+        waypoint_msg.pose.position.x = waypoint_pos[0]
+        waypoint_msg.pose.position.y = waypoint_pos[1]
+        waypoint_msg.pose.position.z = waypoint_pos[2]
+        waypoint_msg.pose.orientation.w = 1
+        self.pose_cmd_pub.publish(waypoint_msg)
+        rospy.loginfo("send the {} waypoint: {}".format(self.target_index, waypoint_pos));
+
+
 
     def init_marker_arrays(self):
         # local target

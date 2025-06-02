@@ -144,7 +144,7 @@ Visualization Manager:
       Marker Topic: /drone_marker
       Name: Marker
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -152,7 +152,7 @@ Visualization Manager:
       Marker Topic: /global_target
       Name: Marker
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -160,7 +160,7 @@ Visualization Manager:
       Marker Topic: /local_target
       Name: Marker
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -218,6 +218,14 @@ Visualization Manager:
       Shaft Length: 0.10000000149011612
       Topic: /prune_path
       Unreliable: false
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /current_pos
+      Name: Marker
+      Namespaces:
+        {}
+      Queue Size: 100
       Value: true
   Enabled: true
   Global Options:
@@ -284,4 +292,4 @@ Window Geometry:
     collapsed: true
   Width: 3840
   X: -32
-  Y: 0
+  Y: 21
