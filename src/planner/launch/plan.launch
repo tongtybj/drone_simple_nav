@@ -11,6 +11,7 @@
     <!-- available options: octomap, pcl -->
 
     <arg name="frame_id" default="world"/>
+    <arg name="raw_pcl_topic" default="/quadrotor/cloud_registered"/>
     <arg name="pcl_topic" default="/pointcloud/assemble"/>
     <arg name="sensor_max_range" default="inf"/>
 
@@ -26,6 +27,11 @@
         <param name="frame_id" type="str" value="$(arg frame_id)" />
         <param name="topic" type="str" value="$(arg pcl_topic)" />
         <param name="hz" type="int" value="1" />
+    </node>
+
+    <node pkg="planner" type="pointcloud_assemble_node" name="pointcloud_assemble" unless="$(arg sim)">
+      <remap from="input_point_cloud" to="$(arg raw_pcl_topic)"/>
+      <remap from="output_point_cloud" to="$(arg pcl_topic)"/>
     </node>
 
     <!-- Octomap -->
