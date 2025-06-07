@@ -219,9 +219,14 @@ class TrajPlanner():
         while not self.plan_server.is_preempt_requested() and not self.reached_target:
             time.sleep(0.01)
 
+            if not self.target_received:
+                return
+
+            if rospy.is_shutdown():
+                return
+
         if self.plan_server.is_preempt_requested():
             rospy.loginfo("Planning preempted!\n")
-            self.end_mission(reached_target=False)
             self.plan_server.set_preempted()
         else:  # this means the target is reached
             result = PlanResult()
