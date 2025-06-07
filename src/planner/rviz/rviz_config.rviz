@@ -5,12 +5,13 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
+        - /PointCloud21
         - /Marker1
         - /Marker2
         - /RobotModel1
-        - /RobotModel1/Status1
         - /Path3
         - /MarkerArray2
+        - /MarkerArray3
       Splitter Ratio: 0.6110304594039917
     Tree Height: 1114
   - Class: rviz/Selection
@@ -68,7 +69,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: AxisColor
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Min Color: 0; 0; 0
@@ -79,11 +80,11 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.009999999776482582
       Style: Points
-      Topic: /pointcloud/output
+      Topic: /pointcloud/assemble
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 1
       Buffer Length: 1
       Class: rviz/Path
@@ -148,7 +149,7 @@ Visualization Manager:
       Marker Topic: /global_target
       Name: Marker
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -156,7 +157,7 @@ Visualization Manager:
       Marker Topic: /local_target
       Name: Marker
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -365,7 +366,15 @@ Visualization Manager:
       Marker Topic: /quadrotor/waypoints
       Name: MarkerArray
       Namespaces:
-        "": true
+        {}
+      Queue Size: 100
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /occupied_cells_vis_array
+      Name: MarkerArray
+      Namespaces:
+        map: true
       Queue Size: 100
       Value: true
   Enabled: true
@@ -396,7 +405,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 31.640132904052734
+      Distance: 52.013587951660156
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -404,17 +413,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 9.4408597946167
-        Y: -0.5607284903526306
-        Z: -5.2092180252075195
+        X: 15.042476654052734
+        Y: -1.7617071866989136
+        Z: -2.2433581352233887
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.0697965621948242
+      Pitch: 1.0297961235046387
       Target Frame: map
-      Yaw: 3.46854829788208
+      Yaw: 3.583547592163086
     Saved: ~
 Window Geometry:
   Displays:
@@ -432,5 +441,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 2548
-  X: 0
-  Y: 0
+  X: -32
+  Y: -32

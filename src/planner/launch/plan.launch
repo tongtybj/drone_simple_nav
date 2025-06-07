@@ -11,7 +11,7 @@
     <!-- available options: octomap, pcl -->
 
     <arg name="frame_id" default="world"/>
-    <arg name="pcl_topic" default="/pointcloud/output"/>
+    <arg name="pcl_topic" default="/pointcloud/assemble"/>
     <arg name="sensor_max_range" default="inf"/>
 
 
@@ -25,14 +25,14 @@
         <param name="path" type="str" value="$(find simulator)/worlds/$(arg gazebo_world).pcd" />
         <param name="frame_id" type="str" value="$(arg frame_id)" />
         <param name="topic" type="str" value="$(arg pcl_topic)" />
-        <param name="hz" type="int" value="2" />
+        <param name="hz" type="int" value="1" />
     </node>
 
     <!-- Octomap -->
     <node pkg="octomap_server" type="octomap_server_node" name="octomap_server">
 
         <!-- name of the fixed frame, needs to be "/map" for SLAM -->
-        <param name="frame_id" type="string" value="$(arg frame_id)" />
+        <param name="frame_id" type="str" value="$(arg frame_id)" />
 
         <!-- topic from where pointcloud2 messages are subscribed -->
         <remap from="/cloud_in" to="$(arg pcl_topic)" />
