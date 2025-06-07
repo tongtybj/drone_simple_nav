@@ -1,0 +1,74 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="sim" default="false" />
+    <arg name="gazebo_world" default="bricks"/>
+    <arg name="init_pos" default="0.0, 0.0, 2.0" />
+    <arg name="target_pos_z" default="1.5" />
+    <arg name="move_vel" default='0.5' />
+    <arg name="plan_mode" default='segment' />
+    <!-- available options: global, segment -->
+    <arg name="map_server" default="octomap" />
+    <!-- available options: octomap, pcl -->
+
+    <arg name="frame_id" default="world"/>
+    <arg name="pcl_topic" default="/pointcloud/output"/>
+    <arg name="sensor_max_range" default="inf"/>
+
+
+    <!-- Rviz -->
+    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find planner)/rviz/rviz_config.rviz">
+      <remap from="/move_base_simple/goal" to="/plan/move_base_simple/goal" />
+    </node>
+
+    <!-- publish pointcloud -->
+    <node pkg="simulator" type="publish_pointcloud" name="publish_pointcloud" if="$(arg sim)">
+        <param name="path" type="str" value="$(find simulator)/worlds/$(arg gazebo_world).pcd" />
+        <param name="frame_id" type="str" value="$(arg frame_id)" />
+        <param name="topic" type="str" value="$(arg pcl_topic)" />
+        <param name="hz" type="int" value="2" />
+    </node>
+
+    <!-- Octomap -->
+    <node pkg="octomap_server" type="octomap_server_node" name="octomap_server">
+
+        <!-- name of the fixed frame, needs to be "/map" for SLAM -->
+        <param name="frame_id" type="string" value="$(arg frame_id)" />
+
+        <!-- topic from where pointcloud2 messages are subscribed -->
+        <remap from="/cloud_in" to="$(arg pcl_topic)" />
+
+        <!-- resolution in meters per pixel -->
+        <param name="resolution" value="0.1" />
+
+        <!-- max range / depth resolution of the kinect in meter -->
+        <param name="sensor_model/max_range" value="$(arg sensor_max_range)" />
+        <param name="latch" value="false" />
+
+        <param name="filter_ground" value="ture" />
+
+        <!-- max/min height for occupancy map, should be in meters -->
+        <param name="pointcloud_max_z" value="1000" />
+        <param name="pointcloud_min_z" value="0" />
+
+        <!-- generate 2D occupancy map from this interval -->
+        <param name="occupancy_min_z" value="0.5" />
+        <param name="occupancy_max_z" value="10" />
+
+    </node>
+
+
+    <!-- traj planner node -->
+    <node pkg="planner" type="traj_planner_node.py" name="planner" output="screen">
+        <rosparam file="$(find planner)/launch/planner_config.yaml" command="load"/>
+        <param name="target_pos_z" value="$(arg target_pos_z)" />
+        <param name="move_vel" value="$(arg move_vel)" />
+        <param name="plan_mode" value="$(arg plan_mode)" />
+        <param name="map_server" value="$(arg map_server)" />
+        <remap from="mavros/local_position/odom" to="/quadrotor/uav/baselink/odom" />
+        <remap from="target_pose" to="/quadrotor/target_pose" />
+        <remap from="target_path" to="/quadrotor/target_path" />
+        <param name="cmd_hz" value="2" />
+        <remap from="/move_base_simple/goal" to="/plan/move_base_simple/goal" />
+    </node>
+
+</launch>

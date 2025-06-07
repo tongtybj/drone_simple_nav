@@ -103,8 +103,6 @@ class TrajPlanner():
         self.target_vis_pub = rospy.Publisher('global_target', Marker, queue_size=10)
         self.local_target_pub = rospy.Publisher('local_target', Marker, queue_size=10)
         self.target_path_pub = rospy.Publisher("target_path", Path, queue_size=1)
-        self.current_pos_pub = rospy.Publisher('current_pos', Marker, queue_size=10)
-
 
         self.raw_path_pub = rospy.Publisher("raw_path", Path, queue_size=1)
         self.prune_path_pub = rospy.Publisher("prune_path", Path, queue_size=1)
@@ -161,22 +159,6 @@ class TrajPlanner():
             rospy.loginfo("Global target reached!\n")
             self.end_mission(reached_target=True)
 
-
-        # debug: publish the current pos
-        marker = Marker()
-        marker.header.frame_id = "map"
-        marker.type = marker.SPHERE
-        marker.action = marker.ADD
-        marker.pose = data.pose.pose
-        marker.scale.x = 0.4
-        marker.scale.y = 0.4
-        marker.scale.z = 0.4
-        marker.color.a = 1.0
-        marker.color.r = 1.0
-        marker.color.g = 0.0
-        marker.color.b = 1.0
-        self.current_pos_pub.publish(marker)
-
     def init_mission(self):
         self.target_received = True
         self.reached_target = False
@@ -214,7 +196,7 @@ class TrajPlanner():
 
     def vis_target(self):
         marker = Marker()
-        marker.header.frame_id = "map"
+        marker.header.frame_id = "world"
         marker.type = marker.SPHERE
         marker.action = marker.ADD
         marker.pose.position.x = self.global_target[0]
@@ -377,7 +359,7 @@ class TrajPlanner():
 
         # visualize path
         raw_path_msg = Path()
-        raw_path_msg.header.frame_id = "map"
+        raw_path_msg.header.frame_id = "world"
         raw_path_msg.header.stamp = rospy.Time.now()
         for pos in raw_path:
             pose = PoseStamped()
@@ -390,7 +372,7 @@ class TrajPlanner():
         self.raw_path_pub.publish(raw_path_msg)
 
         prune_path_msg = Path()
-        prune_path_msg.header.frame_id = "map"
+        prune_path_msg.header.frame_id = "world"
         prune_path_msg.header.stamp = rospy.Time.now()
         for pos in prune_path:
             pose = PoseStamped()
@@ -440,7 +422,7 @@ class TrajPlanner():
     def init_marker_arrays(self):
         # local target
         self.local_target_marker = Marker()
-        self.local_target_marker.header.frame_id = "map"
+        self.local_target_marker.header.frame_id = "world"
         self.local_target_marker.type = Marker.SPHERE
         self.local_target_marker.scale.x = 0.4
         self.local_target_marker.scale.y = 0.4
