@@ -15,6 +15,10 @@
     <arg name="pcl_topic" default="/pointcloud/assemble"/>
     <arg name="sensor_max_range" default="inf"/>
 
+    <arg name="odom_topic" default="/quadrotor/uav/baselink/odom"/>
+    <arg name="target_pose_topic" default="/quadrotor/target_pose"/>
+    <arg name="target_path_topic" default="/quadrotor/target_path"/>
+
 
     <!-- Rviz -->
     <node pkg="rviz" type="rviz" name="rviz" args="-d $(find planner)/rviz/rviz_config.rviz">
@@ -70,11 +74,21 @@
         <param name="move_vel" value="$(arg move_vel)" />
         <param name="plan_mode" value="$(arg plan_mode)" />
         <param name="map_server" value="$(arg map_server)" />
-        <remap from="mavros/local_position/odom" to="/quadrotor/uav/baselink/odom" />
-        <remap from="target_pose" to="/quadrotor/target_pose" />
-        <remap from="target_path" to="/quadrotor/target_path" />
+        <remap from="mavros/local_position/odom" to="$(arg odom_topic)" />
+        <remap from="target_pose" to="$(arg target_pose_topic)" />
+        <remap from="target_path" to="$(arg target_path_topic)" />
         <param name="cmd_hz" value="2" />
         <remap from="/move_base_simple/goal" to="/plan/move_base_simple/goal" />
     </node>
+
+    <group if="$(arg sim)">
+      <param name="planner/min_flight_height" value="0.5"/>
+      <param name="planner/max_flight_height" value="4.0"/>
+    </group>
+
+    <group unless="$(arg sim)">
+      <param name="planner/min_flight_height" value="0.5"/>
+      <param name="planner/max_flight_height" value="2.0"/>
+    </group>
 
 </launch>
