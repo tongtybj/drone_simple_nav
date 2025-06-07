@@ -8,12 +8,6 @@
     <arg name="map_server" default="octomap" />
     <!-- available options: octomap, pcl -->
 
-    <!-- manager node -->
-    <node pkg="planner" type="manager_node.py" name="manager" output="screen">
-        <rosparam file="$(find planner)/launch/manager_config.yaml" command="load"/>
-        <param name="target_pos_z" value="$(arg target_pos_z)" />
-    </node>
-
     <!-- traj planner node -->
     <node pkg="planner" type="traj_planner_node.py" name="planner" output="screen">
         <rosparam file="$(find planner)/launch/planner_config.yaml" command="load"/>

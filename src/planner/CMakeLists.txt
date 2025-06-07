@@ -167,7 +167,6 @@ include_directories(
 catkin_install_python(PROGRAMS
     # scripts/ros_node/esdf_vis_node.py
     scripts/ros_node/odom2base_tf_node.py
-    scripts/ros_node/manager_node.py
     scripts/ros_node/traj_planner_node.py
     scripts/ros_node/visualizer_node.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

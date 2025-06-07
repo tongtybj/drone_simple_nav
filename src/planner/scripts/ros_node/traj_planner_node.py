@@ -90,8 +90,10 @@ class TrajPlanner():
         # Server
         self.plan_server = actionlib.SimpleActionServer('plan', PlanAction, self.execute_mission, False)
         self.plan_server.start()
+        self.plan_client = actionlib.SimpleActionClient('plan', PlanAction)
 
         # Subscribers
+        self.target_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.simple_goal_cb)
         self.flight_state_sub = rospy.Subscriber('mavros/state', State, self.flight_state_cb)
         self.odom_sub = rospy.Subscriber('mavros/local_position/odom', Odometry, self.odom_cb)
 
@@ -110,6 +112,13 @@ class TrajPlanner():
         self.tracking_timer = rospy.Timer(rospy.Duration(0.05), self.tracking_cb)
 
         rospy.loginfo(f"Trajectory planner initialized!")
+
+
+    def simple_goal_cb(self, target):
+
+        goal_msg = PlanGoal()
+        goal_msg.target = target
+        self.plan_client.send_goal(goal_msg)
 
     def flight_state_cb(self, data):
         self.flight_state = data
