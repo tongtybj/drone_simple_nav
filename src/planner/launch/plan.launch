@@ -79,6 +79,7 @@
         <remap from="target_path" to="$(arg target_path_topic)" />
         <param name="cmd_hz" value="2" />
         <remap from="/move_base_simple/goal" to="/plan/move_base_simple/goal" />
+        <remap from="/pointcloud/output" to="$(arg pcl_topic)" />
     </node>
 
     <group if="$(arg sim)">

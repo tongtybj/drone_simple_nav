@@ -64,7 +64,7 @@ class GeoPlanner(TrajUtils):
         tail_index = int(1)
 
         while tail_index < len(path):
-            while map.seg_feasible_check(path[head_index], path[tail_index], step_size=0.1, collision_scale=1.0) or tail_index - head_index == 1:
+            while map.seg_feasible_check(path[head_index], path[tail_index], step_size=0.1) or tail_index - head_index == 1:
                 tail_index += 1
                 if tail_index == len(path):
                     break

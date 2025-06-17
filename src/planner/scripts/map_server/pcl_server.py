@@ -3,11 +3,14 @@ import numpy as np
 import sensor_msgs.point_cloud2 as pc2
 from scipy.spatial import cKDTree
 import math
+import time
 
 
 class PCLServer():
     def __init__(self, collision_threshold=0.4):
         self.collision_threshold = collision_threshold
+
+        self.cnt = 10
 
     def pcl_cb(self, msg):
         # Convert PointCloud2 message to a NumPy array
@@ -19,9 +22,18 @@ class PCLServer():
         input: point: a 3-element list [x, y, z], or numpy array
         return: True if the point is in collision, False otherwise
         '''
+        start_t = time.time()
+        
         if self.tree is None:
             return False
         distance, _ = self.tree.query([point[0], point[1], point[2]], k=1)
+
+        end_t = time.time()
+        if self.cnt > 0:
+            print("kdtree check time: {}".format(end_t - start_t))
+            self.cnt -= 1
+
+        
         return distance < self.collision_threshold
 
     def has_collision_strict(self, point):
