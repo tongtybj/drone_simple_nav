@@ -15,4 +15,4 @@ min_flight_height: 1.0
 max_flight_height: 4.0
 
 # Collision check
-collision_threshold: 0.4
+collision_threshold: 0.5
