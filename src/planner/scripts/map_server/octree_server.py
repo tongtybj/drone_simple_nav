@@ -11,6 +11,8 @@ class OctreeServer():
         self.octree = None
         self.neighbor_dis = collision_threshold
 
+        self.cnt = 10
+
     def octomap_cb(self, msg):
 
         try:
@@ -59,22 +61,36 @@ class OctreeServer():
         return False
 
     def has_collision(self, point, scaling=1.0):
+        resolution = self.octree.getResolution()
+
+        start_t = time.time()
+
         if self.is_point_occupied(point):
             return True
 
-        main_offsets = [
-            [self.neighbor_dis * scaling, 0, 0],
-            [-self.neighbor_dis * scaling, 0, 0],
-            [0, self.neighbor_dis * scaling, 0],
-            [0, -self.neighbor_dis * scaling, 0],
-            [0, 0, self.neighbor_dis * scaling],
-            [0, 0, -self.neighbor_dis * scaling]
-        ]
+        steps = math.ceil(self.neighbor_dis * scaling / resolution)
+        for step in range(steps):
+            val = (step + 1) * resolution
+            main_offsets = [[val, 0, 0],
+                            [-val, 0, 0],
+                            [0, val, 0],
+                            [0, -val, 0],
+                            [0, 0, val],
+                            [0, 0, -val],
+                            [0, val, val],
+                            [0, -val, val],
+                            [0, val, -val],
+                            [0, -val, -val]]
 
-        for offset in main_offsets:
-            check_point = [point[0] + offset[0], point[1] + offset[1], point[2] + offset[2]]
-            if self.is_point_occupied(check_point):
-                return True
+            for offset in main_offsets:
+                check_point = [point[0] + offset[0], point[1] + offset[1], point[2] + offset[2]]
+                if self.is_point_occupied(check_point):
+                    return True
+
+        end_t = time.time()
+        if self.cnt > 0:
+            print("octomap check time: {}".format(end_t - start_t))
+            self.cnt -= 1
 
         return False
 
